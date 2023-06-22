@@ -1,2 +1,2 @@
 # R-code
-A collection of projects consisting of data analytics, data mining, and ANOVA stats.
+A collection of data analytics projects using R software.
