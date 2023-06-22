@@ -1,0 +1,151 @@
+---
+title: "Practicing Basic Analytical Techniques on a Small Dataset using R"
+author: "Carrington Body"
+output: word_document
+---
+
+&nbsp;
+
+<font size="4">
+**Synopsis:** *This is a small project consisting of exercises that will allow me to practice elementary techniques that you can use in R to analyze data sets. These exercises range from making a data frame from reading in a data set to manipulating the data frame and making calculations from specific data.*
+
+&nbsp;
+
+**Creating a Uniform Histogram** Here, I just want to see if I can generate a surplus of random numbers (roughly 100,000) from a uniform distribution from 5 to 20. This means that every random number generated will be a number in the range of 5 to 20, shown on a histogram with a roughly uniform distribution. I will not use ggplot for this exercise.
+
+```{r}
+set.seed(555)
+unifrandvec <- runif(n = 100000, min = 5, max = 20)
+hist(unifrandvec, col = "red")
+```
+
+&nbsp;
+
+**EPA Vehicle Info Data set** For these exercises, I will use the 2021 fuel 
+economy data set from the EPA (Environmental Protection Agency). More details are available at the following link:
+https://www.openintro.org/data/index.php?data=epa2021
+
+
+**Reading in the file** Here, I will read in the csv file and assign the output to a data frame for us to view in the R workspace. I also want to make the variables of the data frame directly accessible in the workspace so that I can manipulate them with different R techniques.
+
+```{r}
+epa2021 <- read.csv("epa2021.csv", header = TRUE)
+#attaching file to access variables
+attach(epa2021)
+#checking structure of dataframe
+str(epa2021)
+#viewing dataframe
+View(epa2021)
+```
+
+&nbsp;
+
+**Observations Based on Different Conditions** In this exercise, I will calculate the fraction of cars in this data set that satisfy the following conditions:
+
+* 1) that have a city mpg of 30 or more.
+```{r}
+total_cars <- dim(epa2021)[1]
+city30 <- sum(epa2021$city_mpg >=30) / total_cars
+city30
+#Per 100 cars, at least 6 of them will have a city mpg of 30 miles or more.
+```
+
+* 2) whose highway mpg is less than their city mpg.
+```{r}
+sum(epa2021$hwy_mpg < epa2021$city_mpg) / total_cars
+#Per 100 cars, about 2 of them will have a highway mpg that is less than their city mpg.
+```
+* 3) that have engine displacement that is at least 3.5 or whose highway mpg is 
+strictly less than 30.
+```{r}
+OrSum <- sum(epa2021$engine_displacement >= 3.5 | epa2021$hwy_mpg < 30) / total_cars
+OrSum
+#Per 100 cars, there would be about 68 cars that have an engine displacement that is at least 3.5 or a highway mpg that is less than 30 miles.
+```
+
+&nbsp;
+
+**Mean, SD, & Quantiles of Porsches** Here, I am getting the mean, standard deviation and the quantiles of the city mpg of all Porsche cars. This will help me analyze specific data that pertain to singular types of entities.
+
+```{r}
+porsches <- subset(epa2021, mfr_name=="Porsche")
+View(porsches)
+#####################
+paste("Mean of city mpg for all porsches:", mean(porsches$city_mpg))
+paste("Standard Deviation of city mpg for all porsches:",sd(porsches$city_mpg))
+quantile(porsches$city_mpg)
+```
+
+&nbsp;
+
+**More Fractions** Here, I will determine the fraction of the Porsche cars that 
+have a city mpg of at least 20.
+
+```{r}
+total_porsche <- dim(porsches)[1]
+porsche.citympg.atleast20 <- sum(porsches$city_mpg >= 20) / total_porsche
+paste("Fraction of Porsches that have a city mpg of at least 20 miles:", porsche.citympg.atleast20)
+print("This means that per 100 Porsches, there will be at least 12 of them that have a city mpg of at least 20 miles.")
+#0.126984126984127 * 63
+print("Since there are only 63 Porsches in this data set, only 8 of them have a city mpg of at least 20 miles.")
+```
+
+&nbsp;
+
+**Smaller Data Frame of Porsches & Ferraris** I will create a smaller data frame consisting 
+only of the Porsche and Ferrari cars in this data set and 
+whose variables consist of mfr_name, engine_displacement, no_cylinders,
+city_mpg, and highway_mpg. This will also help me analyze different levels of data with a selection of variables within a data set.
+
+```{r}
+porsches <- subset(epa2021, mfr_name=="Porsche")
+ferraris <- subset(epa2021, mfr_name=="Ferrari")
+PorFer <- rbind(porsches,ferraris)
+PorFer[c('mfr_name', 'engine_displacement', 'no_cylinders', 'city_mpg', 'hwy_mpg')]
+```
+
+&nbsp;
+
+**Sorting Data Frame in Decreasing Order of City Mpg**
+
+```{r}
+rev(order(PorFer$city_mpg)) #Displays the indexes of car entries in decreasing order
+PorFer[rev(order(PorFer$city_mpg)),]
+```
+
+&nbsp;
+
+**Combined Averages of City mpg & Highway mpg** The EPA rating for combined mpg presumes that we drive 55 percent of the time in the city and 45 percent of the time on the 
+highway, so I am calculating a weighted (combined) average of the city mpg and 
+highway mpg using weights of 0.55 and 0.45, respectively, for *only Ferraris* in this 
+data set.
+
+```{r}
+#0.55 x Average of city mpg + 0.45 x Average of hwy mpg
+ferraris <- subset(epa2021, mfr_name=="Ferrari")
+combined.avg <- round(0.55 * mean(ferraris$city_mpg) + 0.45 * mean(ferraris$hwy_mpg)) #rounding to the nearest whole number
+paste("Combined weighted average of city mpg and highway mpg of all Ferraris in this data set:", combined.avg, "miles")
+```
+
+&nbsp;
+
+**Creating a Bar Plot for Drive System variable (drive_sys) w/ its Respective Counts**
+
+```{r}
+tab <- table(epa2021["drive_sys"])
+xcenter <- barplot(tab,col="green",ylim = c(0,400),xlab="Drive System",ylab="Count")
+counts <- as.integer(tab)
+vertadjust <- 2
+text(xcenter,counts+vertadjust,labels=as.character(counts))
+```
+
+&nbsp;
+
+**Side-by-side Boxplots** Here, I am creating side-by-side boxplots comparing the 
+highway mpg of vehicles that are guzzlers and those that are not.
+
+```{r}
+boxplot(epa2021$hwy_mpg~epa2021$guzzler, col = "yellow", xlab = "Is a guzzler?", ylab = "Highway mpg")
+legend(2,60,legend = c("n = no", "y = yes"))
+```
+</font> 
