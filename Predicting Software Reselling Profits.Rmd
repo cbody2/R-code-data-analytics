@@ -1,0 +1,322 @@
+---
+title: "Predicting Software Reselling Profits"
+author: "Carrington Body"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+&nbsp;
+
+**Necessary Packages:** I need to load these packages and libraries to conduct my analysis.
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+library(ggplot2)
+#install.packages("rlang")
+#install.packages("ggpubr")
+library(ggpubr)
+library(dplyr)
+#install.packages("caret")
+library(MASS)
+library(tidyverse)
+library(leaps)
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("randomForest")
+#install.packages("stargazer")
+#install.packages("forecast")
+#getwd()
+```
+
+**Synopsis:** Tayko Software is a software catalog firm that sells games and educational software. It started out as a software manufacturer and then added third-party titles to its offerings. It recently revised its collection of items in a new catalog, which it mailed out to its customers. This mailing yielded 2000 purchases. Based on these data, Tayko wants to devise a model for predicting the spending amount that a purchasing customer will yield. The file Tayko.csv contains information on 2000 purchases. 
+
+*Table 1 describes the predictors (variables) that I will use in this problem (the Excel file contains additional predictors -- that are insignificant).*
+
+Table 1: Description of Variables for Tayko Software
+
+*FREQ*:	Number of transactions in the preceding year
+*LAST_UPDATE*:	Number of days since last update to customer record
+*WEB*:	Whether customer purchased by Web order at least once
+*GENDER*:	Male or female
+*ADDRESS_RES*:	Whether it is a residential address
+*ADDRESS_US*:	Whether it is a US address
+*SPENDING (response/target variable)*:	Amount spent by customer in test mailing (in dollars)
+
+**Reading in the file** Here, I will read in Tayko.csv and convert it to a data frame. Then, I will make a smaller data set by extracting the necessary predictors to be used in analysis (listed in Table 1).
+
+```{r}
+Taykoo <- read.csv('Tayko.csv', header = TRUE)
+Taykoo.df <- as.data.frame(Taykoo)
+attach(Taykoo.df)
+View(Taykoo.df)
+sub_taykoo <- dplyr::select(Taykoo.df, Freq, last_update_days_ago, Web.order, Gender.male, Address_is_res, US, Spending)
+View(sub_taykoo)
+head(sub_taykoo)
+```
+
+**Any missing data?** I have to make sure that there is no missing data so that I can conduct my analysis. Many times, if there is missing data, you can proceed with analysis only if there is specific instruction on handling it.
+
+```{r}
+sum(is.na(sub_taykoo))
+#This command checks if there are any NAs (missing values) in the data frame. Since it returned 0,
+#this means that there are no missing values. Thus, we have no missing data and can continue
+#with the procedure.
+```
+**Checking the Structure of the Data**
+
+```{r}
+str(sub_taykoo)
+```
+
+**Exploratory Data Analysis** Here, I will explore the relationship between spending and each of the two continuous predictors by using ggplot to create two scatterplots (Spending vs. Freq, and Spending vs. last_update_days_ago).
+
+```{r}
+FreqSpend <- ggplot(sub_taykoo, aes(x = Freq, y = Spending)) + geom_point() + geom_smooth() + stat_cor(method = "pearson", label.x = 12, label.y = 30)
+LastSpend <- ggplot(sub_taykoo, aes(x = last_update_days_ago, y = Spending)) + geom_point() + geom_smooth() + stat_cor(method = "pearson", label.x = 3200, label.y = 1300)
+FreqSpend
+#There seems to be a positive, linear relationship between Spending and Freq. The correlation value
+#between these two variables is 0.69, which is moderately strong. The p-value is nearly 0,
+#so we can say that the correlation value is statistically significant. We can see that,
+#once Freq hit 12-13 transactions, there seems to be a slight drop-off in the spending amount.
+```
+```{r}
+LastSpend
+#On the other hand, the relationship between Spending and Last Update Days Ago has a negative, 
+#but very low correlation with a value of -0.26 and p-value of nearly 0.
+```
+
+**More Exploration & Evaluation on the Explanatory Variables** Here, we can furthermore examine the linear relationship between Spending and the continuous variables Freq & Last_update_days_ago by running linear regression.
+
+```{r}
+#Spending vs Freq
+fit.freq <- lm(Spending~Freq, data = sub_taykoo)
+summary(fit.freq)
+```
+```{r}
+plot(fit.freq)
+```
+
+```{r}
+#Equation for this model: Spending(hat) = -27.50 + 91.83*Freq
+#Adjusted R-squared is 0.4774, which means almost than half of the variability in Spending
+#can be explained by Freq--because of this, we can see why Freq is a such a significant predictor
+#in this model. In our residual plots, we see that we have nonconstant variance and a pattern
+#in the scattering of residuals, so we may have dependency problem (whereas Spending is
+#too dependent on Freq out of the six predictors we have to account for.) Since the p-value
+#is low and less than alpha (0.05), we can say that this model somewhat fits data well and that
+#there is a significant linear relationship between Spending and Freq.
+```
+
+```{r}
+fit.last <- lm(Spending~last_update_days_ago, data = sub_taykoo)
+summary(fit.last)
+```
+
+```{r}
+plot(fit.last)
+```
+
+```{r}
+#Equation: 193.24 - 0.04 * last_update_days_ago
+#The Adjusted R^2 for this model is 0.0655, which is very low. Only 6.5% of the variability in Spending
+#can be explained by last_update_days_ago. This makes sense because of the poor linear relationship
+#that is shown between Spending and last_update_days_ago. This model looks like it has a significant
+#lack of fit, but it actually fits the data well considering what our analysis is based on.
+#This model was bound to have a low R^2 value because of the existing poor linear relationship,
+#compiled with the fact that we are trying to predict how much people would spend in test mailing.
+#There is a significant linear relationship existing between Spending and last_update_days_ago because
+#p-value of the model is low and less than alpha(0.05). CLARIFICATION: Because an independent variable
+#has a poor relationship with the corresponding dependent variable, it does not mean the relationship
+#between the two are insignificant.
+```
+
+**Multicollinearity Issues?** Here, we have to determine whether mulitcollinearity will be a problem since there are more binary predictors (4) than continuous predictors (2). We shall be mindful of this as it can potentially skew our results in predicting resell profits and disrupt the reliability of our statistical inferences.
+
+```{r}
+#install.packages("Hmisc")
+library(Hmisc)
+tayko.corr.matrix <- rcorr(as.matrix(sub_taykoo))
+tayko.corr.matrix #shows the correlation coefficient and respective p-values between all variables
+#in the data set
+```
+```{r}
+#We can see that we do not have any high intercorrelations among the independent variables
+#in our data set, so we are good to go. No multicollinearity issues.
+```
+
+**Multiple Linear Regression** Let's fit a full model for Spending:
+
+**Partition the Data** Before we begin, we want to split our data into a training set and validation set. I will partition the 2000 records into non-overlapping training and validation set with a 60:40 ratio. We want to train our multiple regression model on the training data and, then, assess its performance on the validation data.
+
+```{r}
+set.seed(96) #does not matter what you set the seed to (unless you are checking for results
+#from another machine and want to test and get the same data as me). I will be using different
+#seeds to test multiple models to optimize the predictive accuracy.
+
+train.index <- sample(c(1:dim(sub_taykoo)[1]), 0.6*dim(sub_taykoo)[1])
+valid.index <- setdiff(c(1:dim(sub_taykoo)[1]), train.index)
+sub_taykoo_train.df <- sub_taykoo[train.index, ]
+sub_taykoo_valid.df <- sub_taykoo[valid.index, ]
+dim(sub_taykoo_train.df) #checking number of observations and variables in training set
+dim(sub_taykoo_valid.df) # ^ same thing for validation set
+```
+
+**Fitting a model** Here, we are running the full model (vs. all six predictors) and will see which variables are statistically significant to predict Spending and evaluate the diagnostics on the model.
+
+```{r}
+tayko_flm <- lm(Spending ~ ., data = sub_taykoo_train.df)
+summary(tayko_flm)
+```
+```{r}
+#After testing different seeds, it seems that our statistically significant predictors are Freq,
+#last_update_days_ago, Web.order, and Address_is_res. Web.order should be closely monitored,
+#because in other seeds, this predictor was insignificant (p-value > 0.05).
+
+#Estimated Predictive Linear Equation: 
+#Spending(hat) = 5.74 + 88.02*Freq - 0.01*last_update + 15.95*Web.order + 5.64*Gender.male -
+#89.94*Address_res - 2.64*US
+
+#Keep in mind, the adjusted R^2 is 0.4711, which is close to the fit.freq where we only measured
+#against one predictor. This model may be useful with respect to the trends in this data, but low
+#in precision for accurately predicting profits for Tayko.
+
+#Based on this model, a purchaser with a higher Freq (amount of transactions in the previous year),
+#who also purchased by web order at least once, is most likely to spend a large amount of money.
+#This idea is logical in the sense that a customer who is spending a larger amount of money is
+#probably more active in dealing with Tayko, as they are more likely to be more familiar with
+#(and fond of) the company's products. 
+```
+
+**Evaluating Diagnostics & Validity Conditions**
+
+```{r}
+plot(tayko_flm)
+```
+
+```{r}
+#With the Residuals vs. Fitted plot, we can see that we have a slight parabolic pattern with a few
+#evident outliers. The slight pattern could be a cause for concern, but not disruptive enough to present
+#us with any issues with the randomness in residuals. This occurrence is also due to many data entries
+#in the predictors having the same value, especially in the binary predictors, so we are okay here.
+#Our QQ-plot presents us with a minor problem because we have a break at the right end tail where those
+#outliers seem to take over, but it's not enough to say our data isn't normal. We are okay here as well.
+#The scale-location plot is a warning for nonconstant variance/dependency but this plot is acceptable
+#since majority of fitted values stay within the same range of standardized residuals.
+#With the residuals vs. leverage plot, it is difficult to tell if we have any influential points.
+#Let's try computing it.
+```
+
+```{r}
+plot(cooks.distance(tayko_flm), type = "h")
+```
+
+```{r}
+max(cooks.distance(tayko_flm))
+qf(.5,7,1193) #baseline for Cook's Distance
+```
+```{r}
+#With the baseline being 0.907 and our maximum Cook's Distance being 0.130, we do not have to
+#worry about any points having too much influence.
+```
+
+**Distribution of Residuals?** Let's see what a histogram of the residuals look like now that we have updated our model.
+
+```{r}
+residual.hist.train <- ggplot(data = sub_taykoo_train.df, aes(x = tayko_flm$residuals)) + geom_histogram(fill = 'steelblue', color = 'black') + labs(title = "Histogram of tayko_flm Residuals", x = "Residuals", y = "Frequency")
+residual.hist.train
+```
+```{r}
+#The residuals follow a Normal distribution with a few outliers. Roughly satisfies
+#normality assumptions and randomness is not lost. We can trust the predictions of Spending
+#since they won't be biased.
+```
+
+**Predictive Accuracy** Here, I will show the predictive accuracy of the full model on the training set and the validation set.
+
+```{r}
+library(forecast)
+tayko_flm.train_prediction <- predict(tayko_flm, sub_taykoo_train.df)
+accuracy(tayko_flm.train_prediction, sub_taykoo_train.df$Spending)
+tayko_flm.valid_prediction <- predict(tayko_flm, sub_taykoo_valid.df)
+accuracy(tayko_flm.valid_prediction, sub_taykoo_valid.df$Spending)
+```
+```{r}
+#The two sets of predictive accuracy indicate that we have an issue with overfitting since the RMSE
+#is lower for the training data than the validation data. 138.71 is a high value for RMSE,
+#which indicates the wide scattering around the line of fit we obtained.
+```
+
+**More predictions w/ validation data & Showing Residuals** Here, we can get a more in-depth look at the precision of our model with the actual values of Spending vs. the predicted values of Spending and the residuals. We'll use the first 20 instances of the validation data for this case.
+
+```{r}
+some.residuals <- sub_taykoo_valid.df$Spending[1:20] - tayko_flm.valid_prediction[1:20]
+data.frame("Predicted" = tayko_flm.valid_prediction[1:20], "Actual" = sub_taykoo_valid.df$Spending[1:20], "Residual" = some.residuals)
+```
+
+**Stepwise Regression** Here, I will use stepwise regression to see if we can reduce the variables used in the model to ultimately improve it so by increasing robustness and increasing the predictive accuracy. Previously, I tested the "backwards elimination" method and the "both" (forwards and backwards) method, and they both work the same, so I will only demonstrate the backwards elimination method.
+
+```{r}
+step(tayko_flm, direction = 'backward')
+```
+
+```{r}
+step.tayko_lm <- lm(Spending ~ Freq + last_update_days_ago + Web.order + 
+    Address_is_res, data = sub_taykoo_train.df)
+summary(step.tayko_lm)
+```
+```{r}
+#We can see that using stepwise regression eliminated the statistically insignificant predictors
+#and increased adjusted R^2 by 0.0005, which is not much of a difference.
+
+#Estimated Predictive Linear Equation:
+#Spending(hat) = 7.11 + 87.88*Freq - 0.01*last_update + 15.82*Web.order - 90.43*Address_is_res
+```
+
+```{r}
+#Measuring predictive accuracy
+step.tayko_lm.train_pred <- predict(step.tayko_lm, sub_taykoo_train.df)
+accuracy(step.tayko_lm.train_pred, sub_taykoo_train.df$Spending)
+step.tayko_lm.valid_pred <- predict(step.tayko_lm, sub_taykoo_valid.df)
+accuracy(step.tayko_lm.valid_pred, sub_taykoo_valid.df$Spending)
+```
+```{r}
+#Here, we can see that the RMSE for the validation set decreased with the new model created via
+#stepwise regression in comparison to the original full model by 10%, which is worth noting.
+#This new model shows an increased predictive accuracy and we can do so by looking at the same set
+#of residuals from the predictions of the original model.
+```
+
+```{r}
+some.residuals2 <- sub_taykoo_valid.df$Spending[1:20] - step.tayko_lm.valid_pred[1:20]
+data.frame("Predicted" = step.tayko_lm.valid_pred[1:20], "Actual" = sub_taykoo_valid.df$Spending[1:20], "Residual" = some.residuals2)
+```
+
+```{r}
+#After comparing the numbers, we can see that most of the instances in the validation set have slightly
+#better residuals, meaning we had more accurate predictions in the newer model. As mentioned previously,
+#it is worth noting that in fields of study such as predicting human behavior, and in this case, how
+#much money people are spending on something, you can never expect to get highly accurate predictions.
+#You will most likely get a wide scattering of residuals because people are just harder to predict than
+#things like physical processes. You should expected to get a R^2 of less than 0.50, or 50%, in these
+#case because of the level of unpredictability and the heightened amount of unexplainable variation.
+#The fact that our models' adjusted R^2 were extremely close to 50% is telling. The unexplainable
+#variation, in this case, could be due to multiple different factors that are not accounted for
+#in our dataset, such as people's level of income, the extent to which they may budget, how much they
+#value certain products, etc. All in all, it is safe to say that our model is unbiased, demonstrated
+#an increased in predictive performance, and is ultimately a good linear model for Tayko to use to
+#increase their profits based on the available data.
+```
+
+**Comparing the Regression Results from the Two Models**
+
+```{r}
+library(stargazer)
+stargazer(tayko_flm, step.tayko_lm, type="text", dep.var.labels = c("Amount that customers spend in test mailing (in dollars)"), title = "Regression Results",digits=2,out = "tayko_models.txt")
+```
+
+<br>
+
+
+</font> 
