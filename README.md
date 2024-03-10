@@ -1,5 +1,5 @@
 # R-code-data-analytics
-This is a collection of real-world case studies where I use data analytics to predict outcomes and make business decisions using R software.
+This is a collection of real-world case studies where I use data analytics to predict outcomes and make business decisions using R software (old).
 
 Click on these links to view the datasets I used in each case study:
   - Practicing Basic Analytical Techniques Using R: https://www.openintro.org/data/index.php?data=epa2021
